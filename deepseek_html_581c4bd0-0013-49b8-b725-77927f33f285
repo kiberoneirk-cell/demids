@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Уличный боец | Игра с дракой</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a0f1e 0%, #0c1222 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: #1e2a2e;
+            border-radius: 48px;
+            padding: 20px 25px 25px 25px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.1);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            cursor: pointer;
+            background: #2b3b3e;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .health-bars {
+            flex: 2;
+            background: #0f1219;
+            padding: 12px 18px;
+            border-radius: 60px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.4), 0 2px 3px rgba(255,255,255,0.05);
+        }
+
+        .health-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 8px 0;
+        }
+
+        .health-label {
+            width: 55px;
+            font-weight: bold;
+            text-shadow: 0 1px 0 black;
+            color: #ffd966;
+            font-size: 1rem;
+        }
+
+        .health-bg {
+            flex: 1;
+            height: 18px;
+            background-color: #4a1a1a;
+            border-radius: 40px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 4px #00000066;
+        }
+
+        .health-fill {
+            width: 100%;
+            height: 100%;
+            background: #e34d4d;
+            transition: width 0.1s linear;
+            border-radius: 40px;
+        }
+
+        .player-fill {
+            background: #4cd964;
+            box-shadow: 0 0 6px #32cd32;
+        }
+
+        .enemy-fill {
+            background: #ff5e5e;
+        }
+
+        .actions {
+            display: flex;
+            gap: 18px;
+            background: #00000055;
+            padding: 8px 20px;
+            border-radius: 60px;
+            backdrop-filter: blur(4px);
+        }
+
+        button {
+            background: #2e3b3e;
+            border: none;
+            font-size: 1.8rem;
+            font-weight: bold;
+            padding: 8px 22px;
+            border-radius: 60px;
+            color: #f5f0d7;
+            font-family: monospace;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #121212;
+            transition: 0.07s linear;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        button:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #121212;
+        }
+
+        .reset-btn {
+            background: #7a4c2c;
+            font-size: 1.4rem;
+            padding: 8px 24px;
+            box-shadow: 0 5px 0 #442a18;
+        }
+
+        .fight-log {
+            background: #03070faa;
+            backdrop-filter: blur(8px);
+            border-radius: 40px;
+            padding: 8px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #eee5c1;
+            min-width: 160px;
+            text-align: center;
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 650px) {
+            button { padding: 6px 16px; font-size: 1.4rem; }
+            .health-label { font-size: 0.8rem; width: 45px; }
+            .fight-log { font-size: 0.8rem; min-width: 120px;}
+            .game-container { padding: 12px 18px; }
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+        <div class="info-panel">
+            <div class="health-bars">
+                <div class="health-row">
+                    <span class="health-label">⚔️ ТЫ</span>
+                    <div class="health-bg"><div id="playerHealthFill" class="health-fill player-fill" style="width: 100%"></div></div>
+                </div>
+                <div class="health-row">
+                    <span class="health-label">👹 ВРАГ</span>
+                    <div class="health-bg"><div id="enemyHealthFill" class="health-fill enemy-fill" style="width: 100%"></div></div>
+                </div>
+            </div>
+            <div class="actions">
+                <button id="attackBtn">💥 УДАР</button>
+                <button id="kickBtn">🦶 ПИНОК</button>
+                <button id="resetBtn" class="reset-btn">🔄 БОЙ</button>
+            </div>
+        </div>
+        <div class="fight-log" id="fightLog">⚡ НАЧИНАЙ БОЙ!</div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- ИГРОВЫЕ ПАРАМЕТРЫ ----------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // состояния здоровья
+        let playerHealth = 100;
+        let enemyHealth = 100;
+        let maxHealth = 100;
+
+        // флаги и анимация
+        let gameActive = true;
+        let winner = null; // 'player', 'enemy'
+        
+        // эффекты ударов (для визуала)
+        let hitEffect = { active: false, x: 0, y: 0, type: '' };
+        let enemyHitEffect = { active: false, x: 0, y: 0, type: '' };
+        
+        // блокировка спама анимациями
+        let actionInProgress = false;
+        let lastLog = "";
+
+        // элементы UI
+        const playerFillDiv = document.getElementById('playerHealthFill');
+        const enemyFillDiv = document.getElementById('enemyHealthFill');
+        const fightLogSpan = document.getElementById('fightLog');
+        
+        // звуки нет, но добавим вибрацию на телефонах (лёгкая)
+        function vibrateLight() {
+            if (navigator.vibrate) navigator.vibrate(40);
+        }
+
+        // Обновление полосок здоровья
+        function updateHealthUI() {
+            let playerPercent = Math.max(0, (playerHealth / maxHealth) * 100);
+            let enemyPercent = Math.max(0, (enemyHealth / maxHealth) * 100);
+            playerFillDiv.style.width = playerPercent + "%";
+            enemyFillDiv.style.width = enemyPercent + "%";
+        }
+
+        // Логирование сообщений в панель
+        function setLogMessage(msg, isError = false) {
+            lastLog = msg;
+            fightLogSpan.innerText = msg;
+            fightLogSpan.style.color = isError ? "#ffb347" : "#f9f3c1";
+            setTimeout(() => {
+                if(fightLogSpan.innerText === msg) {
+                    fightLogSpan.style.color = "#eee5c1";
+                }
+            }, 800);
+        }
+
+        // Проверка окончания игры
+        function checkGameOver() {
+            if (!gameActive) return true;
+            if (playerHealth <= 0) {
+                playerHealth = 0;
+                gameActive = false;
+                winner = 'enemy';
+                setLogMessage("💀 ПОРАЖЕНИЕ! Враг победил... Нажми «БОЙ» 💀", true);
+                updateHealthUI();
+                return true;
+            } 
+            else if (enemyHealth <= 0) {
+                enemyHealth = 0;
+                gameActive = false;
+                winner = 'player';
+                setLogMessage("🏆 ПОБЕДА! Ты сокрушил противника! 🔥🏆", false);
+                updateHealthUI();
+                return true;
+            }
+            return false;
+        }
+
+        // AI ход врага (случайная атака после паузы)
+        function enemyTurn() {
+            if (!gameActive) return;
+            if (actionInProgress) return;
+            
+            // выбираем тип атаки врага (удар или пинок)
+            const attackType = Math.random() < 0.6 ? "punch" : "kick";
+            let damage = 0;
+            let attackName = "";
+            if (attackType === "punch") {
+                damage = Math.floor(Math.random() * 12) + 6;  // 6-17
+                attackName = "🧨 Удар локтем";
+            } else {
+                damage = Math.floor(Math.random() * 15) + 5;  // 5-19
+                attackName = "🦵 Пинок с разворота";
+            }
+            
+            // критический удар иногда
+            let isCrit = false;
+            if (Math.random() < 0.2) {
+                damage = Math.floor(damage * 1.4);
+                isCrit = true;
+            }
+            damage = Math.min(damage, playerHealth);
+            
+            // наносим урон игроку
+            actionInProgress = true;
+            playerHealth = Math.max(0, playerHealth - damage);
+            updateHealthUI();
+            
+            // эффект удара по игроку
+            enemyHitEffect.active = true;
+            enemyHitEffect.type = attackType;
+            enemyHitEffect.x = 120;  // позиция игрока (левый боец)
+            enemyHitEffect.y = 220;
+            
+            let msg = `😈 ВРАГ атакует: ${attackName} -${damage} ❤️`;
+            if (isCrit) msg = `💢 КРИТИЧЕСКИЙ УДАР! ${msg}`;
+            setLogMessage(msg);
+            vibrateLight();
+            
+            // обновление отрисовки и проверка конца игры
+            drawGame();
+            const ended = checkGameOver();
+            
+            setTimeout(() => {
+                actionInProgress = false;
+                drawGame();  // убираем эффект через небольшое время (эффект сам исчезнет после перерисовки)
+                if (!ended && gameActive) {
+                    // всё ок, игра продолжается, но если здоровье игрока 0 — не дёргаем
+                    drawGame();
+                } else if (!gameActive) {
+                    drawGame(); // финальное отображение
+                }
+            }, 280);
+            
+            if (!checkGameOver()) {
+                drawGame();
+            } else {
+                drawGame();
+            }
+        }
+        
+        // Атака игрока
+        function playerAttack(attackType) {
+            if (!gameActive) {
+                setLogMessage("Игра окончена! Нажми «БОЙ»", true);
+                return;
+            }
+            if (actionInProgress) {
+                setLogMessage("Секунду... атака уже идёт!", true);
+                return;
+            }
+            
+            let damage = 0;
+            let attackVerb = "";
+            if (attackType === "punch") {
+                damage = Math.floor(Math.random() * 14) + 7; // 7-20
+                attackVerb = "💥 Хук справа";
+            } else { // kick
+                damage = Math.floor(Math.random() * 16) + 6; // 6-21
+                attackVerb = "🌟 Масидари (пинок)";
+            }
+            
+            let isCrit = false;
+            if (Math.random() < 0.25) {
+                damage = Math.floor(damage * 1.5);
+                isCrit = true;
+            }
+            damage = Math.min(damage, enemyHealth);
+            
+            actionInProgress = true;
+            enemyHealth = Math.max(0, enemyHealth - damage);
+            updateHealthUI();
+            
+            // эффект удара на враге
+            hitEffect.active = true;
+            hitEffect.type = attackType;
+            hitEffect.x = 680;  // позиция врага справа
+            hitEffect.y = 215;
+            
+            let msg = `⚡ ТЫ наносишь: ${attackVerb} -${damage} урона!`;
+            if (isCrit) msg = `🔥🔥 КРИТ! ${msg}`;
+            setLogMessage(msg);
+            vibrateLight();
+            
+            drawGame();
+            const gameEnded = checkGameOver();
+            
+            setTimeout(() => {
+                actionInProgress = false;
+                drawGame();
+                if (!gameEnded && gameActive) {
+                    // враг отвечает через задержку (имитация боя)
+                    setTimeout(() => {
+                        if (gameActive && !actionInProgress) {
+                            enemyTurn();
+                        } else if(gameActive) {
+                            // повторная попытка через чуть больше
+                            setTimeout(() => { if(gameActive && !actionInProgress) enemyTurn(); }, 200);
+                        }
+                    }, 350);
+                } else {
+                    drawGame();
+                }
+            }, 280);
+            
+            drawGame();
+        }
+        
+        // Сброс игры
+        function resetGame() {
+            if (actionInProgress) {
+                setLogMessage("Подожди, сейчас идёт атака...", true);
+                return;
+            }
+            playerHealth = maxHealth;
+            enemyHealth = maxHealth;
+            gameActive = true;
+            winner = null;
+            actionInProgress = false;
+            hitEffect.active = false;
+            enemyHitEffect.active = false;
+            updateHealthUI();
+            setLogMessage("⚔️ НОВЫЙ РАУНД! Бей первым! ⚔️");
+            drawGame();
+        }
+        
+        // ---------- РИСОВАНИЕ ВСЕЙ СЦЕНЫ ----------
+        function drawGame() {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // фон арены
+            const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, "#2d423b");
+            grad.addColorStop(1, "#1e2f28");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // текстура пола
+            ctx.fillStyle = "#5f4c38";
+            ctx.fillRect(0, canvas.height-55, canvas.width, 55);
+            ctx.fillStyle = "#ad8a64";
+            for(let i=0;i<12;i++) {
+                ctx.fillRect(i*70+15, canvas.height-48, 30, 8);
+            }
+            
+            // ---- ИГРОК (слева) ----
+            // тень
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#2d221c";
+            ctx.beginPath();
+            ctx.ellipse(140, canvas.height-30, 42, 18, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // тело игрока
+            ctx.fillStyle = "#4a6b5d";
+            ctx.beginPath();
+            ctx.roundRect(105, canvas.height-130, 70, 100, 18);
+            ctx.fill();
+            // голова
+            ctx.fillStyle = "#f3c9a0";
+            ctx.beginPath();
+            ctx.arc(140, canvas.height-155, 30, 0, Math.PI*2);
+            ctx.fill();
+            // глаза
+            ctx.fillStyle = "#111";
+            ctx.beginPath();
+            ctx.arc(125, canvas.height-163, 5, 0, Math.PI*2);
+            ctx.arc(155, canvas.height-163, 5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.arc(123, canvas.height-165, 2, 0, Math.PI*2);
+            ctx.arc(153, canvas.height-165, 2, 0, Math.PI*2);
+            ctx.fill();
+            // бандана
+            ctx.fillStyle = "#c92a2a";
+            ctx.fillRect(112, canvas.height-180, 56, 12);
+            
+            // перчатки
+            ctx.fillStyle = "#b97f44";
+            ctx.beginPath();
+            ctx.ellipse(95, canvas.height-95, 16, 22, -0.4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(180, canvas.height-95, 16, 22, 0.4, 0, Math.PI*2);
+            ctx.fill();
+            
+            // ---- ВРАГ (справа) ----
+            ctx.fillStyle = "#2d1f14";
+            ctx.beginPath();
+            ctx.ellipse(670, canvas.height-30, 44, 19, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#6d4c3c";
+            ctx.beginPath();
+            ctx.roundRect(640, canvas.height-135, 75, 105, 18);
+            ctx.fill();
+            ctx.fillStyle = "#d8a77a";
+            ctx.beginPath();
+            ctx.arc(678, canvas.height-160, 32, 0, Math.PI*2);
+            ctx.fill();
+            // шрам
+            ctx.fillStyle = "#4a2a1a";
+            ctx.beginPath();
+            ctx.moveTo(660, canvas.height-172);
+            ctx.lineTo(675, canvas.height-165);
+            ctx.lineTo(668, canvas.height-155);
+            ctx.fill();
+            // глаз злой
+            ctx.fillStyle = "#dd4444";
+            ctx.beginPath();
+            ctx.arc(665, canvas.height-168, 5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(664, canvas.height-169, 2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#ddd";
+            ctx.beginPath();
+            ctx.arc(692, canvas.height-163, 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(691, canvas.height-164, 1.8, 0, Math.PI*2);
+            ctx.fill();
+            
+            // броня врага
+            ctx.fillStyle = "#7c5c42";
+            ctx.fillRect(648, canvas.height-110, 70, 18);
+            
+            // ЭФФЕКТЫ УДАРОВ
+            if(hitEffect.active) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = "#ffaa33";
+                ctx.font = "bold 32 monospace";
+                ctx.fillStyle = "#ffdd99";
+                ctx.shadowOffsetX = 2;
+                if(hitEffect.type === "punch") 
+                    ctx.fillText("💥", hitEffect.x-15, hitEffect.y-30);
+                else 
+                    ctx.fillText("⚡", hitEffect.x-5, hitEffect.y-40);
+                ctx.shadowBlur = 0;
+                hitEffect.active = false;
+            }
+            
+            if(enemyHitEffect.active) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = "red";
+                ctx.font = "bold 36 monospace";
+                ctx.fillStyle = "#ff6666";
+                ctx.fillText("💢", enemyHitEffect.x+10, enemyHitEffect.y-45);
+                ctx.shadowBlur = 0;
+                enemyHitEffect.active = false;
+            }
+            
+            // текст статуса если конец игры
+            if(!gameActive) {
+                ctx.font = "800 36 'Segoe UI'";
+                ctx.shadowBlur = 4;
+                ctx.fillStyle = winner === 'player' ? "#f9d56e" : "#b33";
+                ctx.shadowColor = "black";
+                ctx.fillText(winner === 'player' ? "VICTORY!" : "GAME OVER", canvas.width/2-100, 70);
+                ctx.font = "bold 18 monospace";
+                ctx.fillStyle = "#fffac2";
+                ctx.fillText("Нажми «БОЙ»", canvas.width/2-70, 115);
+            }
+            
+            ctx.shadowBlur = 0;
+            // индикаторы над головой
+            ctx.font = "bold 16 monospace";
+            ctx.fillStyle = "#ffe3b0";
+            ctx.fillText("YOU", 115, canvas.height-185);
+            ctx.fillText("ENEMY", 650, canvas.height-190);
+        }
+        
+        // helper roundRect
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                this.moveTo(x+r, y);
+                this.lineTo(x+w-r, y);
+                this.quadraticCurveTo(x+w, y, x+w, y+r);
+                this.lineTo(x+w, y+h-r);
+                this.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+                this.lineTo(x+r, y+h);
+                this.quadraticCurveTo(x, y+h, x, y+h-r);
+                this.lineTo(x, y+r);
+                this.quadraticCurveTo(x, y, x+r, y);
+                return this;
+            };
+        }
+        
+        // назначение кнопок
+        document.getElementById('attackBtn').addEventListener('click', () => playerAttack('punch'));
+        document.getElementById('kickBtn').addEventListener('click', () => playerAttack('kick'));
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+        
+        // начальная отрисовка
+        updateHealthUI();
+        drawGame();
+        
+        // Если игрок не атакует, враг может атаковать сам через 2 секунды? добавим агрессию, если долго бездействие
+        let inactivityTimer;
+        function resetInactivity() {
+            if(inactivityTimer) clearTimeout(inactivityTimer);
+            if(!gameActive) return;
+            inactivityTimer = setTimeout(() => {
+                if(gameActive && !actionInProgress && !winner) {
+                    enemyTurn();
+                }
+                resetInactivity();
+            }, 3200);
+        }
+        
+        // запускаем таймер, обновляем при атаке игрока
+        function hookInactivity() {
+            const origAttack = playerAttack;
+            window.playerAttack = playerAttack;
+            resetInactivity();
+        }
+        
+        // перехватываем клики для сброса таймера
+        const originalPA = playerAttack;
+        const wrappedAttack = (type) => {
+            resetInactivity();
+            originalPA(type);
+        };
+        window.playerAttack = wrappedAttack;
+        playerAttack = wrappedAttack;
+        
+        resetInactivity();
+    })();
+</script>
+</body>
+</html>
