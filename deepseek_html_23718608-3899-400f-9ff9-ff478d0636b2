@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, touch-action: manipulation">
+  <title>Тапай Экран - Кликер</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      touch-action: manipulation; /* Предотвращает зум при двойном тапе на мобильных */
+      user-select: none; /* Запрещает выделение текста */
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent; /* Убирает синюю подсветку при тапе */
+      padding: 20px;
+    }
+
+    .game-container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 40px;
+      padding: 30px 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .score-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 25px;
+      color: white;
+    }
+
+    .score-box {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 20px;
+      padding: 12px 25px;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .score-label {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #a0b9ce;
+      margin-bottom: 4px;
+    }
+
+    .score-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #ffd700;
+      text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+      line-height: 1;
+    }
+
+    .level-box {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 20px;
+      padding: 12px 25px;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .level-label {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #a0b9ce;
+      margin-bottom: 4px;
+    }
+
+    .level-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #ff6b9d;
+      text-shadow: 0 0 15px rgba(255, 107, 157, 0.5);
+      line-height: 1;
+    }
+
+    /* Основная область для тапов */
+    .tap-area {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      max-width: 320px;
+      background: radial-gradient(circle at 30% 30%, #ff4d6d, #c9184a);
+      border-radius: 50%;
+      margin: 15px 0 25px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 15px 35px rgba(201, 24, 74, 0.6), 0 0 0 8px rgba(255, 255, 255, 0.1);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      position: relative;
+      color: white;
+      font-size: 1.8rem;
+      font-weight: bold;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+      letter-spacing: 2px;
+      user-select: none;
+    }
+
+    .tap-area:active {
+      transform: scale(0.92);
+      box-shadow: 0 5px 15px rgba(201, 24, 74, 0.8), 0 0 0 4px rgba(255, 255, 255, 0.3);
+      background: radial-gradient(circle at 30% 30%, #ff758f, #b7094c);
+    }
+
+    /* Эффект всплывающих очков */
+    .float-text {
+      position: absolute;
+      color: #ffd700;
+      font-weight: bold;
+      font-size: 1.8rem;
+      pointer-events: none;
+      animation: floatUp 0.8s ease-out forwards;
+      text-shadow: 0 0 10px rgba(0,0,0,0.5);
+      z-index: 10;
+    }
+
+    @keyframes floatUp {
+      0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-80px) scale(1.8);
+      }
+    }
+
+    .progress-section {
+      width: 100%;
+      margin-bottom: 20px;
+      color: white;
+      text-align: center;
+    }
+
+    .progress-text {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+      color: #d0d0d0;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 14px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.4);
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #ffd700, #ffaa00);
+      border-radius: 20px;
+      transition: width 0.2s ease;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.7);
+    }
+
+    .upgrade-btn {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 14px 30px;
+      border-radius: 30px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      margin-top: 5px;
+      letter-spacing: 1px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .upgrade-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+      border-color: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    }
+
+    .upgrade-btn:active {
+      transform: scale(0.96);
+    }
+
+    .upgrade-btn.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      filter: grayscale(0.5);
+    }
+
+    .next-level-cost {
+      font-size: 0.8rem;
+      color: #ccc;
+      margin-top: 5px;
+    }
+
+    .reset-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.3);
+      color: rgba(255,255,255,0.7);
+      margin-top: 15px;
+      padding: 8px 25px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .reset-btn:hover {
+      background: rgba(255,0,0,0.2);
+      border-color: rgba(255,100,100,0.7);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <!-- Счет и уровень -->
+    <div class="score-panel">
+      <div class="score-box">
+        <div class="score-label">Очки</div>
+        <div class="score-value" id="scoreDisplay">0</div>
+      </div>
+      <div class="level-box">
+        <div class="level-label">Уровень</div>
+        <div class="level-value" id="levelDisplay">1</div>
+      </div>
+    </div>
+
+    <!-- Кнопка-область для тапов -->
+    <div class="tap-area" id="tapButton">
+      ТАП
+      <br>👇
+    </div>
+
+    <!-- Прогресс до следующего уровня -->
+    <div class="progress-section">
+      <div class="progress-text">
+        <span>До уровня <span id="nextLevelDisplay">2</span></span>
+        <span><span id="currentProgress">0</span> / <span id="requiredPoints">20</span></span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- Кнопка улучшения (увеличивает очки за тап) -->
+    <button class="upgrade-btn" id="upgradeButton">
+      ⚡ Улучшить тап (+1) — Стоимость: <span id="upgradeCost">15</span> очков
+    </button>
+    <div class="next-level-cost" id="tapPowerDisplay">Сила тапа: 1</div>
+
+    <!-- Сброс -->
+    <button class="reset-btn" id="resetButton">🔄 Начать заново</button>
+  </div>
+
+  <script>
+    (function() {
+      // --- Состояние игры ---
+      let score = 0;
+      let level = 1;
+      let tapPower = 1;          // Очки за одно нажатие
+      let pointsForNextLevel = 20; // Базовое требование для уровня 2
+      
+      // Стоимость улучшения
+      let upgradeCost = 15;
+
+      // --- DOM элементы ---
+      const scoreDisplay = document.getElementById('scoreDisplay');
+      const levelDisplay = document.getElementById('levelDisplay');
+      const tapButton = document.getElementById('tapButton');
+      const progressFill = document.getElementById('progressFill');
+      const currentProgressSpan = document.getElementById('currentProgress');
+      const requiredPointsSpan = document.getElementById('requiredPoints');
+      const nextLevelDisplaySpan = document.getElementById('nextLevelDisplay');
+      const upgradeButton = document.getElementById('upgradeButton');
+      const upgradeCostSpan = document.getElementById('upgradeCost');
+      const tapPowerDisplay = document.getElementById('tapPowerDisplay');
+      const resetButton = document.getElementById('resetButton');
+
+      // --- Функции обновления интерфейса ---
+      function updateUI() {
+        // Обновляем текст счета и уровня
+        scoreDisplay.textContent = score;
+        levelDisplay.textContent = level;
+        
+        // Обновляем прогресс-бар
+        const pointsNeeded = getPointsForLevel(level + 1);
+        const prevLevelPoints = getPointsForLevel(level);
+        const progressInCurrentLevel = score - prevLevelPoints;
+        const range = pointsNeeded - prevLevelPoints;
+        
+        let percent = 0;
+        if (range > 0) {
+          percent = Math.min(100, Math.max(0, (progressInCurrentLevel / range) * 100));
+        }
+        progressFill.style.width = `${percent}%`;
+        
+        currentProgressSpan.textContent = score;
+        requiredPointsSpan.textContent = pointsNeeded;
+        nextLevelDisplaySpan.textContent = level + 1;
+        
+        // Обновить кнопку улучшения
+        upgradeCostSpan.textContent = upgradeCost;
+        tapPowerDisplay.textContent = `Сила тапа: ${tapPower}`;
+        
+        // Проверить, доступно ли улучшение
+        if (score >= upgradeCost) {
+          upgradeButton.classList.remove('disabled');
+        } else {
+          upgradeButton.classList.add('disabled');
+        }
+      }
+
+      // Расчет очков, необходимых для достижения уровня N
+      function getPointsForLevel(targetLevel) {
+        if (targetLevel <= 1) return 0;
+        // Формула: 20 * (targetLevel - 1) * targetLevel / 1.5  (немного кривая сложность)
+        // Например: Ур2 = 20, Ур3 = 20*2*3/1.5=80? Давай попроще: 20 + (уровень-2)*15 + (уровень-2)^2 * 5
+        // Сделаем понятную прогрессию: 20, 45, 80, 125, 180...
+        let base = 20;
+        for (let i = 2; i <= targetLevel; i++) {
+          if (i === 2) base = 20;
+          else base = Math.floor(base * 1.4 + 10); 
+        }
+        // Чтобы не путаться, сделаем явно: 
+        // Ур2: 20, Ур3: 50, Ур4: 90, Ур5: 150, Ур6: 230...
+        if (targetLevel === 2) return 20;
+        return Math.floor(20 + (targetLevel - 2) * 25 + Math.pow(targetLevel - 2, 2) * 4);
+      }
+
+      // Проверка повышения уровня
+      function checkLevelUp() {
+        let leveledUp = false;
+        while (score >= getPointsForLevel(level + 1)) {
+          level++;
+          leveledUp = true;
+          // Небольшой бонус при повышении уровня (опционально)
+        }
+        if (leveledUp) {
+          // Можно добавить визуальный эффект, но пока просто обновим UI
+        }
+      }
+
+      // --- Обработчик тапа ---
+      function handleTap(event) {
+        // Предотвращаем стандартное поведение (особенно на мобильных)
+        event.preventDefault();
+        
+        // Добавляем очки
+        score += tapPower;
+        
+        // Создаем всплывающий текст с очками
+        createFloatingText(event, `+${tapPower}`);
+        
+        // Проверяем уровень
+        checkLevelUp();
+        
+        // Обновляем интерфейс
+        updateUI();
+        
+        // Небольшая вибрация на мобильных устройствах (если поддерживается)
+        if (window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate(15); // 15 мс вибрация
+        }
+      }
+
+      // Создание анимированного текста
+      function createFloatingText(event, text) {
+        const floatElement = document.createElement('div');
+        floatElement.className = 'float-text';
+        floatElement.textContent = text;
+        
+        // Позиционируем относительно кнопки тапа
+        const rect = tapButton.getBoundingClientRect();
+        // Для мыши используем координаты курсора, для тач-событий - координаты касания
+        let clientX, clientY;
+        if (event.touches) {
+          // Тач-событие
+          clientX = event.touches[0].clientX;
+          clientY = event.touches[0].clientY;
+        } else {
+          // Мышь
+          clientX = event.clientX;
+          clientY = event.clientY;
+        }
+        
+        // Относительно кнопки
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        
+        floatElement.style.left = `${x}px`;
+        floatElement.style.top = `${y}px`;
+        
+        tapButton.appendChild(floatElement);
+        
+        // Удаляем после анимации
+        floatElement.addEventListener('animationend', () => {
+          floatElement.remove();
+        });
+      }
+
+      // --- Улучшение тапа ---
+      function buyUpgrade() {
+        if (score < upgradeCost) {
+          alert('Недостаточно очков для улучшения!');
+          return;
+        }
+        
+        score -= upgradeCost;
+        tapPower += 1;
+        
+        // Увеличиваем стоимость следующего улучшения
+        upgradeCost = Math.floor(upgradeCost * 1.7);
+        
+        // Проверяем, не понизился ли уровень (если очков стало меньше)
+        // Уровень не должен понижаться, но на всякий случай оставим как есть.
+        updateUI();
+      }
+
+      // --- Сброс игры ---
+      function resetGame() {
+        if (confirm('Вы уверены, что хотите начать заново? Весь прогресс будет потерян.')) {
+          score = 0;
+          level = 1;
+          tapPower = 1;
+          upgradeCost = 15;
+          updateUI();
+        }
+      }
+
+      // --- Назначение обработчиков событий ---
+      // Поддержка как мыши, так и тач-событий
+      tapButton.addEventListener('click', handleTap);
+      tapButton.addEventListener('touchstart', handleTap, { passive: false });
+      
+      // Чтобы избежать двойного срабатывания на мобильных (click + touchstart)
+      tapButton.addEventListener('touchend', (e) => e.preventDefault());
+      
+      upgradeButton.addEventListener('click', buyUpgrade);
+      resetButton.addEventListener('click', resetGame);
+
+      // Инициализация UI
+      updateUI();
+      
+      // Дополнительно: предотвращение нежелательного зума и скролла на мобильных
+      document.body.addEventListener('touchstart', (e) => {
+        if (e.target === tapButton || tapButton.contains(e.target)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+    })();
+  </script>
+</body>
+</html>
