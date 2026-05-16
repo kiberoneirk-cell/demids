@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Гоночная игра</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            border: 3px solid #fff;
+            box-shadow: 0 0 30px rgba(255, 50, 50, 0.5);
+        }
+        canvas {
+            display: block;
+            background: #333;
+        }
+        #scoreBoard {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px black;
+            pointer-events: none;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px black;
+            text-align: center;
+            display: none;
+            pointer-events: none;
+        }
+        #restart {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+            z-index: 10;
+        }
+        #restart:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="scoreBoard">Очки: 0</div>
+        <div id="gameOver">ИГРА ОКОНЧЕНА</div>
+        <button id="restart">ИГРАТЬ СНОВА</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreBoard = document.getElementById('scoreBoard');
+        const gameOverDiv = document.getElementById('gameOver');
+        const restartBtn = document.getElementById('restart');
+
+        // Размеры канваса
+        canvas.width = 400;
+        canvas.height = 600;
+
+        // Переменные игры
+        let player = {
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 100,
+            width: 50,
+            height: 80,
+            speed: 5
+        };
+
+        let obstacles = [];
+        let score = 0;
+        let gameSpeed = 3;
+        let gameRunning = true;
+        let animationId;
+        let keys = {
+            left: false,
+            right: false
+        };
+
+        // Цвета для машин-препятствий
+        const obstacleColors = ['#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
+
+        // Класс препятствия
+        class Obstacle {
+            constructor() {
+                this.width = 50;
+                this.height = 80;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.color = obstacleColors[Math.floor(Math.random() * obstacleColors.length)];
+                this.speed = gameSpeed + Math.random() * 2;
+            }
+
+            update() {
+                this.y += this.speed;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Окна
+                ctx.fillStyle = '#87CEEB';
+                ctx.fillRect(this.x + 5, this.y + 10, 15, 12);
+                ctx.fillRect(this.x + 30, this.y + 10, 15, 12);
+                ctx.fillRect(this.x + 5, this.y + 40, 15, 12);
+                ctx.fillRect(this.x + 30, this.y + 40, 15, 12);
+                
+                // Колеса
+                ctx.fillStyle = '#111';
+                ctx.fillRect(this.x - 3, this.y + 8, 8, 15);
+                ctx.fillRect(this.x + this.width - 5, this.y + 8, 8, 15);
+                ctx.fillRect(this.x - 3, this.y + this.height - 23, 8, 15);
+                ctx.fillRect(this.x + this.width - 5, this.y + this.height - 23, 8, 15);
+            }
+        }
+
+        // Рисование игрока (красная машина)
+        function drawPlayer() {
+            // Основной кузов
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            
+            // Капот
+            ctx.fillStyle = '#c0392b';
+            ctx.fillRect(player.x + 5, player.y - 5, player.width - 10, 10);
+            
+            // Окна
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(player.x + 8, player.y + 10, 15, 12);
+            ctx.fillRect(player.x + 27, player.y + 10, 15, 12);
+            
+            // Фары
+            ctx.fillStyle = '#f1c40f';
+            ctx.fillRect(player.x + 5, player.y + player.height - 8, 10, 8);
+            ctx.fillRect(player.x + player.width - 15, player.y + player.height - 8, 10, 8);
+            
+            // Колеса
+            ctx.fillStyle = '#111';
+            ctx.fillRect(player.x - 3, player.y + 8, 8, 15);
+            ctx.fillRect(player.x + player.width - 5, player.y + 8, 8, 15);
+            ctx.fillRect(player.x - 3, player.y + player.height - 23, 8, 15);
+            ctx.fillRect(player.x + player.width - 5, player.y + player.height - 23, 8, 15);
+        }
+
+        // Рисование дорожной разметки
+        function drawRoad() {
+            // Обочина
+            ctx.fillStyle = '#555';
+            ctx.fillRect(0, 0, 20, canvas.height);
+            ctx.fillRect(canvas.width - 20, 0, 20, canvas.height);
+            
+            // Прерывистая линия
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < canvas.height; i += 40) {
+                ctx.fillRect(canvas.width / 2 - 3, i, 6, 20);
+            }
+        }
+
+        // Проверка столкновений
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // Обновление игры
+        function update() {
+            if (!gameRunning) return;
+            
+            // Движение игрока
+            if (keys.left && player.x > 20) {
+                player.x -= player.speed;
+            }
+            if (keys.right && player.x < canvas.width - player.width - 20) {
+                player.x += player.speed;
+            }
+            
+            // Создание препятствий
+            if (Math.random() < 0.02) {
+                obstacles.push(new Obstacle());
+            }
+            
+            // Обновление препятствий
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].update();
+                
+                // Проверка столкновения
+                if (checkCollision(player, obstacles[i])) {
+                    gameOver();
+                    return;
+                }
+                
+                // Удаление препятствий за экраном и начисление очков
+                if (obstacles[i].y > canvas.height) {
+                    obstacles.splice(i, 1);
+                    score += 10;
+                    scoreBoard.textContent = `Очки: ${score}`;
+                    
+                    // Увеличение скорости
+                    if (score % 100 === 0 && gameSpeed < 8) {
+                        gameSpeed += 0.5;
+                    }
+                }
+            }
+        }
+
+        // Отрисовка
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawRoad();
+            drawPlayer();
+            
+            obstacles.forEach(obstacle => obstacle.draw());
+        }
+
+        // Игровой цикл
+        function gameLoop() {
+            update();
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // Конец игры
+        function gameOver() {
+            gameRunning = false;
+            gameOverDiv.style.display = 'block';
+            restartBtn.style.display = 'block';
+        }
+
+        // Сброс игры
+        function resetGame() {
+            player.x = canvas.width / 2 - 25;
+            obstacles = [];
+            score = 0;
+            gameSpeed = 3;
+            gameRunning = true;
+            scoreBoard.textContent = 'Очки: 0';
+            gameOverDiv.style.display = 'none';
+            restartBtn.style.display = 'none';
+        }
+
+        // Обработчики событий
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') {
+                keys.left = true;
+                e.preventDefault();
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd') {
+                keys.right = true;
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') {
+                keys.left = false;
+                e.preventDefault();
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd') {
+                keys.right = false;
+                e.preventDefault();
+            }
+        });
+
+        restartBtn.addEventListener('click', () => {
+            resetGame();
+        });
+
+        // Сенсорное управление для мобильных
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touchX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+            if (touchX < canvas.width / 2) {
+                keys.left = true;
+                keys.right = false;
+            } else {
+                keys.right = true;
+                keys.left = false;
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys.left = false;
+            keys.right = false;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touchX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+            if (touchX < canvas.width / 2) {
+                keys.left = true;
+                keys.right = false;
+            } else {
+                keys.right = true;
+                keys.left = false;
+            }
+        });
+
+        // Запуск игры
+        gameLoop();
+    </script>
+</body>
+</html>
