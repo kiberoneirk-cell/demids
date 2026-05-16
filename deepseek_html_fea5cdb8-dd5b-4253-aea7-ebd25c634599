@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Построй свой дом — игра</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #1b6b3c 0%, #0f4d2a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: #2b2b1f;
+            border-radius: 72px;
+            padding: 24px 28px 32px 28px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.1);
+        }
+
+        .game-panel {
+            background: #fef0cf;
+            border-radius: 48px;
+            padding: 20px;
+            box-shadow: inset 0 0 0 2px #fff9e8, inset 0 0 0 6px #d9b48b, 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 32px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.3);
+            cursor: pointer;
+            background: #b7d0e5;
+        }
+
+        .info {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            background: #1e2a1c;
+            padding: 12px 24px;
+            border-radius: 60px;
+            color: #f9e7b3;
+        }
+
+        .resources {
+            display: flex;
+            gap: 24px;
+            background: #00000044;
+            padding: 6px 18px;
+            border-radius: 40px;
+            backdrop-filter: blur(2px);
+        }
+
+        .resource {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            font-size: 1.4rem;
+            text-shadow: 0 1px 2px black;
+        }
+
+        .resource span:first-child {
+            font-size: 1.6rem;
+        }
+
+        .resource span:last-child {
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: #00000066;
+            padding: 0 12px;
+            border-radius: 32px;
+            line-height: 1.4;
+        }
+
+        .actions {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #fed859;
+            border: none;
+            font-weight: bold;
+            font-size: 1.05rem;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 4px 0 #8b5a2b;
+            color: #2d2b1f;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #8b5a2b;
+        }
+
+        .reset-btn {
+            background: #c97e5a;
+            color: white;
+            box-shadow: 0 4px 0 #6a3e24;
+        }
+
+        .build-message {
+            background: #000000aa;
+            backdrop-filter: blur(10px);
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        @media (max-width: 550px) {
+            .game-container {
+                padding: 16px;
+            }
+            .resource span:last-child {
+                font-size: 1.2rem;
+                padding: 0 8px;
+            }
+            button {
+                padding: 6px 14px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-container">
+        <div class="game-panel">
+            <canvas id="gameCanvas" width="700" height="450" style="width:100%; height:auto; max-width:700px; aspect-ratio:700/450"></canvas>
+            <div class="info">
+                <div class="resources">
+                    <div class="resource"><span>🪵</span> <span id="woodCount">0</span></div>
+                    <div class="resource"><span>🪨</span> <span id="stoneCount">0</span></div>
+                </div>
+                <div class="actions">
+                    <button id="collectWoodBtn">🌲 Собрать древесину +3</button>
+                    <button id="collectStoneBtn">⛰️ Добыть камень +2</button>
+                    <button id="buildBtn">🏗️ Построить часть дома</button>
+                    <button id="resetBtn" class="reset-btn">🔄 Сброс</button>
+                </div>
+                <div class="build-message" id="messageArea">🏠 Нажми на ресурсы, чтобы строить!</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ----- ИГРОВЫЕ ПАРАМЕТРЫ -----
+        let wood = 5;      // начальный запас древесины
+        let stone = 3;     // начальный запас камня
+
+        // Прогресс строительства (0 - ничего не построено, 100 - полный дом)
+        let buildProgress = 0;
+
+        // Стоимость 1 единицы прогресса
+        const WOOD_PER_PROGRESS = 2;
+        const STONE_PER_PROGRESS = 1;
+
+        // Максимальный прогресс (дом полностью построен)
+        const MAX_PROGRESS = 100;
+
+        // DOM элементы
+        const woodSpan = document.getElementById('woodCount');
+        const stoneSpan = document.getElementById('stoneCount');
+        const messageDiv = document.getElementById('messageArea');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ---- Функции обновления UI и отрисовки ----
+        function updateResourcesUI() {
+            woodSpan.innerText = Math.floor(wood);
+            stoneSpan.innerText = Math.floor(stone);
+        }
+
+        // Отображение системных сообщений (ненадолго)
+        let messageTimeout = null;
+        function setMessage(text, isError = false) {
+            if(messageTimeout) clearTimeout(messageTimeout);
+            messageDiv.innerText = text;
+            messageDiv.style.color = isError ? "#ffbf9f" : "#f9f0c0";
+            messageDiv.style.textShadow = isError ? "0 0 2px red" : "none";
+            messageTimeout = setTimeout(() => {
+                if(buildProgress >= MAX_PROGRESS) {
+                    messageDiv.innerText = "✨ ДОМ ГОТОВ! Ты — настоящий строитель! ✨";
+                    messageDiv.style.color = "#ffd966";
+                } else {
+                    messageDiv.innerText = "🏠 Нажми на ресурсы, чтобы строить!";
+                    messageDiv.style.color = "#f9e7b3";
+                }
+                messageDiv.style.textShadow = "none";
+            }, 2000);
+        }
+
+        // Проверка, построен ли уже дом
+        function isHouseComplete() {
+            return buildProgress >= MAX_PROGRESS;
+        }
+
+        // Попытка построить часть дома
+        function tryBuild() {
+            if(isHouseComplete()) {
+                setMessage("🏆 Дом уже полностью построен! Нажми сброс для новой игры.", false);
+                return false;
+            }
+
+            // сколько прогресса можем добавить?
+            let maxPossibleProgress = MAX_PROGRESS - buildProgress;
+            // максимально возможный шаг, основанный на ресурсах
+            let maxByWood = Math.floor(wood / WOOD_PER_PROGRESS);
+            let maxByStone = Math.floor(stone / STONE_PER_PROGRESS);
+            let maxStepsByResources = Math.min(maxByWood, maxByStone);
+            
+            if(maxStepsByResources <= 0) {
+                setMessage(`❌ Не хватает ресурсов! Нужно: древесина ${WOOD_PER_PROGRESS} + камень ${STONE_PER_PROGRESS} за 1% дома.`, true);
+                return false;
+            }
+            
+            // сколько хотим построить (по умолчанию 1 шаг, но можно до остатка)
+            let stepsToBuild = Math.min(maxStepsByResources, maxPossibleProgress);
+            // но для комфорта сразу постройка 1 единицы прогресса, но если ресурсов много и прогресс не полный, можно строить больше?
+            // Сделаем удобно: строим сразу столько шагов, сколько позволяет минимум ресурсов, но не более 5 за раз,
+            // и не более оставшегося прогресса. Это приятнее, чем кликать 100 раз.
+            // Однако игроку будет веселее, если сразу можно вложить много. Ограничим 5 за раз, но если прогресс близок к концу — достроим.
+            let maxBulk = Math.min(5, maxPossibleProgress);
+            let buildAmount = Math.min(stepsToBuild, maxBulk);
+            if(buildAmount <= 0) buildAmount = 1; // страховка
+            
+            let woodCost = buildAmount * WOOD_PER_PROGRESS;
+            let stoneCost = buildAmount * STONE_PER_PROGRESS;
+            
+            if(wood >= woodCost && stone >= stoneCost) {
+                wood -= woodCost;
+                stone -= stoneCost;
+                buildProgress += buildAmount;
+                if(buildProgress > MAX_PROGRESS) buildProgress = MAX_PROGRESS;
+                
+                updateResourcesUI();
+                drawHouse();
+                
+                if(buildProgress >= MAX_PROGRESS) {
+                    setMessage("🎉 ПОЗДРАВЛЯЮ! Ты построил великолепный дом! 🎉", false);
+                    drawHouse(); // финальный рисунок
+                } else {
+                    setMessage(`✅ Построено +${buildAmount}% дома! Осталось ${MAX_PROGRESS-buildProgress}%`, false);
+                }
+                return true;
+            } else {
+                setMessage(`⚠️ Недостаточно ресурсов для ${buildAmount}%`, true);
+                return false;
+            }
+        }
+
+        // Сбор древесины
+        function collectWood() {
+            if(isHouseComplete()) {
+                setMessage("Дом готов! Начни новую игру через сброс.", true);
+                return;
+            }
+            wood += 3;
+            updateResourcesUI();
+            setMessage("🌲 +3 древесины! Теперь можно строить дальше.", false);
+            drawHouse(); // просто обновляем отрисовку (показать счастливый смайлик)
+        }
+
+        // Добыча камня
+        function collectStone() {
+            if(isHouseComplete()) {
+                setMessage("Игра завершена, нажми сброс чтобы играть заново.", true);
+                return;
+            }
+            stone += 2;
+            updateResourcesUI();
+            setMessage("⛰️ +2 камня! Отлично для фундамента.", false);
+            drawHouse();
+        }
+
+        // Сброс игры
+        function resetGame() {
+            wood = 8;
+            stone = 6;
+            buildProgress = 0;
+            updateResourcesUI();
+            setMessage("🔄 Игра сброшена! Строй свой дом заново.", false);
+            drawHouse();
+        }
+
+        // ---- РИСОВАНИЕ ДОМА (художественный прогресс) ----
+        // Рисуем красивый домик, который достраивается по мере прогресса
+        function drawHouse() {
+            if(!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Небо и трава
+            ctx.fillStyle = "#c1e3fe";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#86bf6c";
+            ctx.beginPath();
+            ctx.rect(0, canvas.height-90, canvas.width, 90);
+            ctx.fill();
+            // солнышко
+            ctx.fillStyle = "#f9d56e";
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(70, 70, 38, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#f5bc42";
+            ctx.beginPath();
+            ctx.arc(70, 70, 28, 0, Math.PI*2);
+            ctx.fill();
+            
+            // вычисляем, сколько процентов дома достроено
+            let percent = Math.min(1, buildProgress / MAX_PROGRESS);
+            
+            // ---- СТЕНЫ (основной прямоугольник) ----
+            let houseX = 240, houseY = 170;
+            let houseW = 280, houseH = 210;
+            
+            // Стена появляется постепенно (сначала контур, потом заливка)
+            ctx.save();
+            // заливка стены в зависимости от прогресса
+            let wallFill = `rgba(210, 180, 140, ${0.3 + percent*0.7})`;
+            ctx.fillStyle = wallFill;
+            ctx.fillRect(houseX, houseY, houseW, houseH);
+            ctx.strokeStyle = "#7a5a3a";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(houseX, houseY, houseW, houseH);
+            
+            // текстура кирпичей / досок при большом прогрессе
+            if(percent > 0.4) {
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "#a57248";
+                for(let i=0; i<5; i++) {
+                    let lineY = houseY + 30 + i*35;
+                    if(lineY < houseY+houseH) {
+                        ctx.beginPath();
+                        ctx.moveTo(houseX+10, lineY);
+                        ctx.lineTo(houseX+houseW-10, lineY);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            // ---- КРЫША (треугольник, появляется по прогрессу от 30%) ----
+            if(percent >= 0.3) {
+                let roofPercent = Math.min(1, (percent - 0.3)/0.7);
+                ctx.fillStyle = `rgba(160, 82, 45, ${0.3 + roofPercent*0.7})`;
+                ctx.beginPath();
+                ctx.moveTo(houseX-20, houseY);
+                ctx.lineTo(houseX+houseW/2, houseY-70);
+                ctx.lineTo(houseX+houseW+20, houseY);
+                ctx.fill();
+                ctx.strokeStyle = "#5a3a22";
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(houseX-20, houseY);
+                ctx.lineTo(houseX+houseW/2, houseY-70);
+                ctx.lineTo(houseX+houseW+20, houseY);
+                ctx.stroke();
+                // черепица
+                if(roofPercent > 0.6) {
+                    ctx.fillStyle = "#c97e3a";
+                    for(let i=0;i<4;i++) {
+                        let xOff = houseX+40 + i*55;
+                        let yOff = houseY-25;
+                        ctx.beginPath();
+                        ctx.ellipse(xOff, yOff, 12, 7, 0, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+            
+            // ---- ДВЕРЬ (появляется после 20%) ----
+            if(percent >= 0.2) {
+                let doorAlpha = Math.min(1, (percent - 0.2)/0.4);
+                ctx.fillStyle = `rgba(101, 67, 33, ${0.5 + doorAlpha*0.5})`;
+                ctx.fillRect(houseX+houseW/2-30, houseY+houseH-70, 60, 70);
+                ctx.fillStyle = "#e0b05e";
+                ctx.beginPath();
+                ctx.arc(houseX+houseW/2+10, houseY+houseH-35, 5, 0, Math.PI*2);
+                ctx.fill();
+                // ручка
+                ctx.fillStyle = "#c9871b";
+                ctx.beginPath();
+                ctx.arc(houseX+houseW/2-15, houseY+houseH-37, 4, 0, Math.PI*2);
+                ctx.fill();
+            } else {
+                // дверь только набросок
+                ctx.strokeStyle = "#b87c4f";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(houseX+houseW/2-30, houseY+houseH-70, 60, 70);
+            }
+            
+            // ---- ОКНА (два окна) ----
+            // левое окно появляется с 10% прогресса
+            if(percent >= 0.1) {
+                let winAlpha = Math.min(1, percent*1.5);
+                ctx.fillStyle = `rgba(173, 216, 230, ${0.4 + winAlpha*0.6})`;
+                ctx.fillRect(houseX+30, houseY+50, 55, 55);
+                ctx.strokeStyle = "#5d3a1a";
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(houseX+30, houseY+50, 55, 55);
+                ctx.beginPath();
+                ctx.moveTo(houseX+57.5, houseY+50);
+                ctx.lineTo(houseX+57.5, houseY+105);
+                ctx.moveTo(houseX+30, houseY+77.5);
+                ctx.lineTo(houseX+85, houseY+77.5);
+                ctx.stroke();
+            }
+            // правое окно появляется с 40%
+            if(percent >= 0.4) {
+                let winAlpha2 = Math.min(1, (percent-0.3)/0.5);
+                ctx.fillStyle = `rgba(173, 216, 230, ${0.3 + winAlpha2*0.7})`;
+                ctx.fillRect(houseX+houseW-85, houseY+50, 55, 55);
+                ctx.strokeStyle = "#5d3a1a";
+                ctx.strokeRect(houseX+houseW-85, houseY+50, 55, 55);
+                ctx.beginPath();
+                ctx.moveTo(houseX+houseW-57.5, houseY+50);
+                ctx.lineTo(houseX+houseW-57.5, houseY+105);
+                ctx.moveTo(houseX+houseW-85, houseY+77.5);
+                ctx.lineTo(houseX+houseW-30, houseY+77.5);
+                ctx.stroke();
+            }
+            
+            // ---- ДЫМОВАЯ ТРУБА (появляется после 50%) ----
+            if(percent >= 0.5) {
+                let pipeAlpha = Math.min(1, (percent-0.4)/0.3);
+                ctx.fillStyle = `rgba(139, 69, 19, ${0.6+pipeAlpha*0.4})`;
+                ctx.fillRect(houseX+210, houseY-35, 30, 55);
+                ctx.fillStyle = `rgba(90, 45, 20, 0.9)`;
+                ctx.fillRect(houseX+207, houseY-38, 36, 10);
+                // дым
+                if(percent > 0.7) {
+                    ctx.fillStyle = `rgba(200,200,200,0.6)`;
+                    ctx.beginPath();
+                    ctx.ellipse(houseX+225, houseY-55, 12, 8, 0, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(houseX+235, houseY-68, 15, 10, 0, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+            
+            // ---- ЦВЕТЫ / заборчик от прогресса (радость) ----
+            if(percent >= 0.6) {
+                for(let i=0;i<5;i++) {
+                    ctx.fillStyle = `hsl(${40 + i*30}, 70%, 60%)`;
+                    ctx.beginPath();
+                    ctx.arc(houseX-20 + i*25, houseY+houseH-15, 5, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+            
+            // --- Надпись прогресса ---
+            ctx.font = "bold 22px 'Segoe UI'";
+            ctx.fillStyle = "#2e241f";
+            ctx.shadowBlur = 0;
+            ctx.fillText(`${Math.floor(percent*100)}%`, houseX+houseW/2-30, houseY-12);
+            
+            // Доп. персонаж-строитель если прогресс больше 0 и меньше 100
+            if(percent > 0 && percent < 1 && !isHouseComplete()) {
+                ctx.font = "32px sans-serif";
+                ctx.fillStyle = "#000000aa";
+                ctx.fillText("👷", houseX+houseW+15, houseY+houseH-20);
+                ctx.fillStyle = "#3a2a1f";
+                ctx.font = "bold 12px monospace";
+                ctx.fillText("стройка", houseX+houseW+12, houseY+houseH-5);
+            }
+            if(isHouseComplete()) {
+                ctx.font = "26px sans-serif";
+                ctx.fillStyle = "#ffd966";
+                ctx.shadowBlur = 4;
+                ctx.fillText("🏆 ГОТОВО! 🏆", houseX+60, houseY-35);
+                ctx.font = "bold 20px sans-serif";
+                ctx.fillStyle = "#fff0b5";
+                ctx.fillText("♥ ИДЕАЛЬНЫЙ ДОМ ♥", houseX+50, houseY+houseH+25);
+            }
+            ctx.shadowBlur = 0;
+        }
+        
+        // --- Инициализация и подключение обработчиков ---
+        function init() {
+            updateResourcesUI();
+            drawHouse();
+            
+            document.getElementById('collectWoodBtn').addEventListener('click', () => {
+                collectWood();
+                drawHouse();
+            });
+            document.getElementById('collectStoneBtn').addEventListener('click', () => {
+                collectStone();
+                drawHouse();
+            });
+            document.getElementById('buildBtn').addEventListener('click', () => {
+                tryBuild();
+                drawHouse();
+            });
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                resetGame();
+                drawHouse();
+            });
+            
+            // дополнительно клик по canvas - для удовольствия (тоже стройка)
+            canvas.addEventListener('click', (e) => {
+                if(!isHouseComplete()) {
+                    tryBuild();
+                    drawHouse();
+                } else {
+                    setMessage("🏁 Дом готов! Сбросьте игру чтобы строить заново.", true);
+                }
+            });
+        }
+        
+        init();
+    })();
+</script>
+</body>
+</html>
