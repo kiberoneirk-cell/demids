@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Колесо фортуны</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: white;
+    }
+
+    .game-container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 90%;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      background: linear-gradient(45deg, #ffd700, #ffaa00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .wheel-container {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      margin: 0 auto 2rem;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      transition: transform 0.05s linear;
+    }
+
+    .pointer {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 40px solid #ff4444;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+      z-index: 10;
+    }
+
+    .word-display {
+      font-size: 2.5rem;
+      letter-spacing: 0.5rem;
+      margin: 1.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      min-height: 4rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .players-panel {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+
+    .player-info {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .current-player {
+      background: #ffd700;
+      color: #1a1a2e;
+      padding: 0.3rem 1rem;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 1rem 0;
+    }
+
+    button {
+      padding: 0.8rem 1.5rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: transform 0.1s, box-shadow 0.1s;
+      text-transform: uppercase;
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    .btn-spin {
+      background: #ff4444;
+      color: white;
+      font-size: 1.3rem;
+      padding: 1rem 3rem;
+      box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4);
+    }
+
+    .btn-letter {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+
+    .btn-solve {
+      background: #ffd700;
+      color: #1a1a2e;
+    }
+
+    .btn-new {
+      background: #6c5ce7;
+      color: white;
+    }
+
+    .btn-bankrupt {
+      background: #555;
+      color: white;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-top: 0.5rem;
+    }
+
+    input {
+      padding: 0.5rem 1rem;
+      border-radius: 25px;
+      border: none;
+      font-size: 1rem;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.9);
+      width: 120px;
+    }
+
+    .message {
+      font-size: 1.1rem;
+      color: #ffd700;
+      margin: 0.5rem 0;
+      min-height: 1.5rem;
+    }
+
+    .result-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .result-content {
+      background: #1a1a2e;
+      padding: 2rem;
+      border-radius: 20px;
+      text-align: center;
+    }
+
+    .result-content h2 {
+      font-size: 2rem;
+      color: #ffd700;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>🎡 Колесо фортуны</h1>
+    
+    <div class="wheel-container">
+      <div class="pointer"></div>
+      <canvas id="wheelCanvas" width="300" height="300"></canvas>
+    </div>
+
+    <div class="word-display" id="wordDisplay"></div>
+
+    <div class="players-panel">
+      <div class="player-info">
+        <span id="player1Info">Игрок 1: 0 ₽</span>
+        <span class="current-player" id="currentPlayerLabel">Ход: Игрок 1</span>
+        <span id="player2Info">Игрок 2: 0 ₽</span>
+      </div>
+      <div class="message" id="message"></div>
+      <div class="controls">
+        <button class="btn-spin" id="spinBtn">КРУТИТЬ</button>
+      </div>
+      <div class="controls">
+        <button class="btn-letter" id="vowelBtn">Назвать гласную (50₽)</button>
+        <button class="btn-letter" id="consonantBtn">Назвать согласную</button>
+      </div>
+      <div class="input-area">
+        <input type="text" id="letterInput" placeholder="Буква" maxlength="1" autocomplete="off">
+      </div>
+      <div class="controls">
+        <button class="btn-solve" id="solveBtn">Назвать слово</button>
+        <button class="btn-new" id="newGameBtn">Новая игра</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-modal" id="resultModal">
+    <div class="result-content">
+      <h2 id="resultTitle"></h2>
+      <p id="resultWord" style="font-size: 1.5rem; margin: 1rem;"></p>
+      <p id="resultScores" style="font-size: 1.2rem;"></p>
+      <button class="btn-new" onclick="newGame()">Играть снова</button>
+    </div>
+  </div>
+
+  <script>
+    // === ДАННЫЕ ИГРЫ ===
+    const words = [
+      'АВТОМОБИЛЬ', 'САМОЛЕТ', 'КОМПЬЮТЕР', 'ПРОГРАММИСТ',
+      'КОСМОНАВТ', 'БИБЛИОТЕКА', 'ВЕЛОСИПЕД', 'СОЛНЦЕ',
+      'ТЕЛЕВИЗОР', 'МАТЕМАТИКА', 'ПИАНИНО', 'АРХИТЕКТОР',
+      'СЛОВАРЬ', 'ФОТОГРАФИЯ', 'ДИНОЗАВР', 'ШОКОЛАД'
+    ];
+
+    // Сектора колеса (очки)
+    const sectors = [
+      { value: 500, color: '#ff6b6b', label: '500' },
+      { value: 300, color: '#feca57', label: '300' },
+      { value: 800, color: '#48dbfb', label: '800' },
+      { value: 400, color: '#ff9ff3', label: '400' },
+      { value: 1000, color: '#54a0ff', label: '1000' },
+      { value: 0, color: '#1e272e', label: 'БАНКРОТ', isBankrupt: true },
+      { value: 600, color: '#00d2d3', label: '600' },
+      { value: 200, color: '#f368e0', label: '200' },
+    ];
+
+    // === СОСТОЯНИЕ ИГРЫ ===
+    let currentWord = '';
+    let displayedWord = [];
+    let playerScores = [0, 0];
+    let currentPlayer = 0;
+    let wheelValue = 0;
+    let isSpinning = false;
+    let rotationAngle = 0;
+    let gameActive = false;
+
+    // === DOM ЭЛЕМЕНТЫ ===
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const wordDisplay = document.getElementById('wordDisplay');
+    const player1Info = document.getElementById('player1Info');
+    const player2Info = document.getElementById('player2Info');
+    const currentPlayerLabel = document.getElementById('currentPlayerLabel');
+    const messageEl = document.getElementById('message');
+    const letterInput = document.getElementById('letterInput');
+    const resultModal = document.getElementById('resultModal');
+
+    // === ОТРИСОВКА КОЛЕСА ===
+    function drawWheel() {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = 130;
+      const angleStep = (2 * Math.PI) / sectors.length;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      sectors.forEach((sector, i) => {
+        const startAngle = rotationAngle + i * angleStep;
+        const endAngle = startAngle + angleStep;
+
+        // Сектор
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.closePath();
+        
+        // Градиент для сектора
+        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+        gradient.addColorStop(0, sector.color);
+        gradient.addColorStop(1, '#2d3436');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Текст
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(startAngle + angleStep / 2);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 16px "Segoe UI"';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 4;
+        ctx.fillText(sector.label, radius - 15, 6);
+        ctx.restore();
+      });
+
+      // Центр колеса
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 15, 0, 2 * Math.PI);
+      const centerGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 15);
+      centerGradient.addColorStop(0, '#fff');
+      centerGradient.addColorStop(1, '#aaa');
+      ctx.fillStyle = centerGradient;
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // === ВЫБОР СЛУЧАЙНОГО СЛОВА ===
+    function getRandomWord() {
+      return words[Math.floor(Math.random() * words.length)];
+    }
+
+    // === НАЧАЛО НОВОЙ ИГРЫ ===
+    function newGame() {
+      currentWord = getRandomWord();
+      displayedWord = Array(currentWord.length).fill('_');
+      playerScores = [0, 0];
+      currentPlayer = 0;
+      wheelValue = 0;
+      isSpinning = false;
+      rotationAngle = 0;
+      gameActive = true;
+      
+      resultModal.style.display = 'none';
+      updateDisplay();
+      drawWheel();
+      messageEl.textContent = 'Игрок 1, крутите колесо!';
+      letterInput.value = '';
+      letterInput.disabled = false;
+    }
+
+    // === ОБНОВЛЕНИЕ ЭКРАНА ===
+    function updateDisplay() {
+      wordDisplay.textContent = displayedWord.join(' ');
+      player1Info.textContent = `Игрок 1: ${playerScores[0]} ₽`;
+      player2Info.textContent = `Игрок 2: ${playerScores[1]} ₽`;
+      currentPlayerLabel.textContent = `Ход: Игрок ${currentPlayer + 1}`;
+    }
+
+    // === ПОКАЗАТЬ СООБЩЕНИЕ ===
+    function showMessage(text) {
+      messageEl.textContent = text;
+    }
+
+    // === ПЕРЕКЛЮЧЕНИЕ ИГРОКА ===
+    function switchPlayer() {
+      currentPlayer = currentPlayer === 0 ? 1 : 0;
+      updateDisplay();
+      wheelValue = 0;
+      showMessage(`Игрок ${currentPlayer + 1}, крутите колесо!`);
+    }
+
+    // === ВРАЩЕНИЕ КОЛЕСА ===
+    function spinWheel() {
+      if (!gameActive || isSpinning) return;
+      
+      isSpinning = true;
+      showMessage('Колесо вращается...');
+      
+      // Случайное количество оборотов
+      const spinDuration = 3000 + Math.random() * 2000;
+      const totalRotation = (5 + Math.random() * 5) * Math.PI * 2; // 5-10 оборотов
+      const startAngle = rotationAngle;
+      const startTime = performance.now();
+
+      function animate(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / spinDuration, 1);
+        
+        // Функция плавного замедления
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        rotationAngle = startAngle + totalRotation * easeOut;
+        
+        drawWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          // Колесо остановилось - определяем сектор
+          isSpinning = false;
+          const normalizedAngle = rotationAngle % (Math.PI * 2);
+          const angleStep = (Math.PI * 2) / sectors.length;
+          
+          // Указатель сверху (270 градусов / 3*PI/2)
+          const pointerAngle = (3 * Math.PI / 2 - normalizedAngle + Math.PI * 2) % (Math.PI * 2);
+          const sectorIndex = Math.floor(pointerAngle / angleStep);
+          const landedSector = sectors[sectorIndex % sectors.length];
+          
+          if (landedSector.isBankrupt) {
+            playerScores[currentPlayer] = 0;
+            showMessage(`💸 БАНКРОТ! Игрок ${currentPlayer + 1} теряет все очки!`);
+            updateDisplay();
+            switchPlayer();
+          } else {
+            wheelValue = landedSector.value;
+            showMessage(`Выпало: ${wheelValue} ₽! Назовите букву.`);
+          }
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // === ПРОВЕРКА БУКВЫ ===
+    function guessLetter(letter) {
+      if (!gameActive || isSpinning) {
+        showMessage('Сначала крутите колесо!');
+        return;
+      }
+      
+      if (wheelValue === 0 && letter !== '') {
+        showMessage('Сначала крутите колесо!');
+        return;
+      }
+
+      letter = letter.toUpperCase();
+      if (!letter.match(/[А-ЯЁ]/)) {
+        showMessage('Введите русскую букву!');
+        return;
+      }
+
+      let found = false;
+      for (let i = 0; i < currentWord.length; i++) {
+        if (currentWord[i] === letter && displayedWord[i] === '_') {
+          displayedWord[i] = letter;
+          found = true;
+        }
+      }
+
+      updateDisplay();
+
+      if (found) {
+        const points = wheelValue || 50; // 50 для гласных
+        playerScores[currentPlayer] += points;
+        updateDisplay();
+        showMessage(`✅ Есть такая буква! +${points} ₽`);
+        
+        // Проверка на победу
+        if (!displayedWord.includes('_')) {
+          endGame();
+        }
+      } else {
+        showMessage(`❌ Нет такой буквы. Ход переходит.`);
+        switchPlayer();
+      }
+      
+      wheelValue = 0;
+    }
+
+    // === НАЗВАТЬ ГЛАСНУЮ ===
+    function guessVowel() {
+      if (!gameActive || isSpinning) {
+        showMessage('Дождитесь окончания вращения!');
+        return;
+      }
+      
+      if (playerScores[currentPlayer] < 50) {
+        showMessage('Недостаточно очков для покупки гласной (нужно 50 ₽)');
+        return;
+      }
+
+      const letter = letterInput.value;
+      const vowels = 'АЕЁИОУЫЭЮЯ';
+      
+      if (!letter || !vowels.includes(letter.toUpperCase())) {
+        showMessage('Введите гласную букву (А, Е, Ё, И, О, У, Ы, Э, Ю, Я)');
+        return;
+      }
+
+      playerScores[currentPlayer] -= 50;
+      wheelValue = 50;
+      guessLetter(letter);
+      letterInput.value = '';
+    }
+
+    // === НАЗВАТЬ СОГЛАСНУЮ ===
+    function guessConsonant() {
+      if (!gameActive || isSpinning) {
+        showMessage('Дождитесь окончания вращения!');
+        return;
+      }
+
+      const letter = letterInput.value;
+      const vowels = 'АЕЁИОУЫЭЮЯ';
+      
+      if (!letter || vowels.includes(letter.toUpperCase())) {
+        showMessage('Введите согласную букву');
+        return;
+      }
+
+      guessLetter(letter);
+      letterInput.value = '';
+    }
+
+    // === НАЗВАТЬ СЛОВО ЦЕЛИКОМ ===
+    function solveWord() {
+      if (!gameActive) return;
+      
+      const guess = prompt('Введите слово целиком:');
+      if (!guess) return;
+      
+      if (guess.toUpperCase() === currentWord) {
+        // Открываем все буквы
+        displayedWord = currentWord.split('');
+        playerScores[currentPlayer] += 1000; // Бонус за отгадывание
+        updateDisplay();
+        endGame();
+      } else {
+        showMessage('❌ Неправильно! Ход переходит.');
+        switchPlayer();
+      }
+    }
+
+    // === КОНЕЦ ИГРЫ ===
+    function endGame() {
+      gameActive = false;
+      
+      let winner = 0;
+      if (playerScores[1] > playerScores[0]) winner = 1;
+      
+      document.getElementById('resultTitle').textContent = 
+        playerScores[0] === playerScores[1] ? '🤝 Ничья!' : `🏆 Победил Игрок ${winner + 1}!`;
+      document.getElementById('resultWord').textContent = `Слово: ${currentWord}`;
+      document.getElementById('resultScores').textContent = 
+        `Счёт: ${playerScores[0]} ₽ - ${playerScores[1]} ₽`;
+      
+      resultModal.style.display = 'flex';
+    }
+
+    // === ОБРАБОТЧИКИ СОБЫТИЙ ===
+    document.getElementById('spinBtn').addEventListener('click', spinWheel);
+    document.getElementById('vowelBtn').addEventListener('click', guessVowel);
+    document.getElementById('consonantBtn').addEventListener('click', guessConsonant);
+    document.getElementById('solveBtn').addEventListener('click', solveWord);
+    document.getElementById('newGameBtn').addEventListener('click', newGame);
+
+    // Ввод с клавиатуры
+    letterInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const letter = letterInput.value.toUpperCase();
+        const vowels = 'АЕЁИОУЫЭЮЯ';
+        if (vowels.includes(letter)) {
+          guessVowel();
+        } else {
+          guessConsonant();
+        }
+      }
+    });
+
+    // === ЗАПУСК ===
+    newGame();
+  </script>
+</body>
+</html>
